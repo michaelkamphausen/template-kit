@@ -42,8 +42,8 @@ public final class DateFormat: TagRenderer {
     public func render(tag: TagContext) throws -> Future<TemplateData> {
         /// Require at least one parameter.
         switch tag.parameters.count {
-        case 1, 2: break
-        default: throw tag.error(reason: "Invalid parameter count: \(tag.parameters.count). 1 or 2 required.")
+        case 1, 2, 3: break
+        default: throw tag.error(reason: "Invalid parameter count: \(tag.parameters.count). 1, 2 or 3 required.")
         }
 
         /// Expect the date to be a floating point number.
@@ -61,18 +61,32 @@ public final class DateFormat: TagRenderer {
 
         let dateFormatter: DateFormatter
         var dateFormat: String?
-        if tag.parameters.count == 2 {
+        if tag.parameters.count >= 2 {
             /// Set format as the second param. If that's not available, we'll use `self.defaultDateFormatterFactory`.
             dateFormat = tag.parameters[1].string
         }
+        
+        var locale: Locale?
+        if tag.parameters.count >= 3,
+            let identifier = tag.parameters[2].string {
+            /// Set locale with an identifier from the third param. If that's not available, the date formatter's default is used
+            locale = Locale(identifier: identifier)
+        }
 
-        let cacheKey = dateFormat ?? DateFormatterCache.defaultFormatterPlaceholderKey
+        let cacheKey: String
+        if let dateFormat = dateFormat {
+            cacheKey = [dateFormat, locale?.identifier].compactMap({ $0 }).joined(separator: "|")
+        } else {
+            cacheKey = DateFormatterCache.defaultFormatterPlaceholderKey
+        }
+        
         if let formatter = dateFormatterCache.dateFormatters[cacheKey] {
             dateFormatter = formatter
         } else {
             if let dateFormat = dateFormat {
                 dateFormatter = DateFormatter()
                 dateFormatter.dateFormat = dateFormat
+                dateFormatter.locale = locale
             } else {
                 dateFormatter = self.defaultDateFormatterFactory()
             }
